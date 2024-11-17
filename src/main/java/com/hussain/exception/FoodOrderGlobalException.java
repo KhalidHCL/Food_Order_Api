@@ -27,4 +27,9 @@ public class FoodOrderGlobalException {
 	public ResponseEntity<String> orderNotFoundException(OrderNotFoundException ex) {
 		return new ResponseEntity<>(ex.getMessage(),HttpStatus.NOT_FOUND);
 	}
+	
+	@ExceptionHandler(IllegalArgumentException.class)
+	public ResponseEntity<String> invalidQuantityInputException(IllegalArgumentException ex) {
+		return new ResponseEntity<>(ex.getMessage(),HttpStatus.BAD_REQUEST);
+	}
 }
