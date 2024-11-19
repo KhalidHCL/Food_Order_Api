@@ -6,8 +6,12 @@ import java.util.Objects;
 import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
+import com.hussain.client.BankAPIClient;
+import com.hussain.client.OrderStatus;
+import com.hussain.dto.FundTransferDto;
 import com.hussain.dto.ItemCollection;
 import com.hussain.dto.MultiOrderDto;
 import com.hussain.dto.OrderDto;
@@ -18,6 +22,7 @@ import com.hussain.entites.OrderItem;
 import com.hussain.entites.User;
 import com.hussain.exception.FoodNotAvailable;
 import com.hussain.exception.OrderNotFoundException;
+import com.hussain.exception.TransactionFailException;
 import com.hussain.exception.UserNotFoundException;
 import com.hussain.exception.VendorNameIsNotFount;
 import com.hussain.repository.FoodItemRepository;
@@ -40,6 +45,9 @@ public class FoodOrderServiceImple implements FoodOrderService {
 	@Autowired
 	private FoodItemRepository foodItemRepository;
 
+	@Autowired
+	private BankAPIClient bankClient;
+
 	@Override
 	public List<FoodItem> searchFoodByName(String name) throws FoodNotAvailable {
 
@@ -52,7 +60,7 @@ public class FoodOrderServiceImple implements FoodOrderService {
 
 	@Override
 	public List<FoodItem> searchVendorByName(String name) throws VendorNameIsNotFount {
-        List<FoodItem> vendorName = foodItemRepository.findByVendorName(name);
+		List<FoodItem> vendorName = foodItemRepository.findByVendorName(name);
 		if (vendorName.isEmpty() || vendorName.size() <= 0) {
 			throw new VendorNameIsNotFount("vender Name is not Available ");
 		}
@@ -60,7 +68,7 @@ public class FoodOrderServiceImple implements FoodOrderService {
 	}
 
 	public ResponseOrderDto placeSingleItemOrder(OrderDto orderDto)
-			throws FoodNotAvailable, UserNotFoundException, VendorNameIsNotFount {
+			throws FoodNotAvailable, UserNotFoundException, VendorNameIsNotFount, TransactionFailException {
 		User user = userRepository.findById(orderDto.getUserId())
 				.orElseThrow(() -> new UserNotFoundException("User is not Exist"));
 		FoodItem fooditem = foodItemRepository.findById(orderDto.getItemId())
@@ -69,6 +77,11 @@ public class FoodOrderServiceImple implements FoodOrderService {
 		Integer nosOfItem = orderDto.getNosOfItem();
 		if (nosOfItem == null || nosOfItem <= 0) {
 			throw new IllegalArgumentException("Number of items must be greater than zero");
+		}
+		Double totalAmount =orderDto.getFundTransferDto().setAmount((Double.parseDouble(fooditem.getItemprice()) * nosOfItem));
+		String success = bankClient.transferFunds(orderDto.getFundTransferDto());	
+		if(!success.equalsIgnoreCase("success")) {
+			throw new TransactionFailException("Transaction is failed please try again");
 		}
 		Order order = new Order();
 		order.setDeliveryAddress(orderDto.getDeliveryAddress());
@@ -143,9 +156,9 @@ public class FoodOrderServiceImple implements FoodOrderService {
 //
 //	    return responseOrderDto;
 //	}
-	
-	//using java 8
-	
+
+	// using java 8
+
 //	public ResponseOrderDto placeMultipleItemOrder(MultiOrderDto multiOrderDto)
 //	        throws FoodNotAvailable, UserNotFoundException {
 //	    // Find user or throw exception
@@ -214,112 +227,99 @@ public class FoodOrderServiceImple implements FoodOrderService {
 //	            savedOrder.getNosOfItem(), totalOrderPrice
 //	    );
 //	}
-	
-	public ResponseOrderDto placeMultipleItemOrder(MultiOrderDto multiOrderDto) 
-	        throws  UserNotFoundException,FoodNotAvailable {
-	    // Validate the input DTO
-	    validateMultiOrderDto(multiOrderDto);
 
-	    // Find and validate the user
-	    User user = userRepository.findById(multiOrderDto.getUserId())
-	            .orElseThrow(() -> new UserNotFoundException("User does not exist"));
+	public ResponseOrderDto placeMultipleItemOrder(MultiOrderDto multiOrderDto)
+			throws UserNotFoundException, FoodNotAvailable {
+		// Validate the input DTO
+		validateMultiOrderDto(multiOrderDto);
 
-	    // Initialize order object
-	    Order order = initializeOrder(multiOrderDto, user);
+		// Find and validate the user
+		User user = userRepository.findById(multiOrderDto.getUserId())
+				.orElseThrow(() -> new UserNotFoundException("User does not exist"));
 
-	    // Process item collection
-	    List<OrderItem> orderItems = processOrderItems(multiOrderDto, order);
+		// Initialize order object
+		Order order = initializeOrder(multiOrderDto, user);
 
-	    // Calculate and set total price and total item count
-	    double totalOrderPrice = calculateTotalOrderPrice(orderItems);
-	    int totalItemCount = calculateTotalItemCount(orderItems);
+		// Process item collection
+		List<OrderItem> orderItems = processOrderItems(multiOrderDto, order);
 
-	    order.setOrderItems(orderItems);
-	    order.setNosOfItem(totalItemCount);
-	    order.setTotalPrice(totalOrderPrice);
+		// Calculate and set total price and total item count
+		double totalOrderPrice = calculateTotalOrderPrice(orderItems);
+		int totalItemCount = calculateTotalItemCount(orderItems);
 
-	    // Save and return response DTO
-	    Order savedOrder = orderRepository.save(order);
-	    return buildResponseOrderDto(savedOrder, user, totalOrderPrice);
+		order.setOrderItems(orderItems);
+		order.setNosOfItem(totalItemCount);
+		order.setTotalPrice(totalOrderPrice);
+
+		// Save and return response DTO
+		Order savedOrder = orderRepository.save(order);
+		return buildResponseOrderDto(savedOrder, user, totalOrderPrice);
 	}
 
 	private void validateMultiOrderDto(MultiOrderDto multiOrderDto) {
-	    if (multiOrderDto.getItemCollection() == null || multiOrderDto.getItemCollection().isEmpty()) {
-	        throw new IllegalArgumentException("Item collection cannot be null or empty");
-	    }
+		if (multiOrderDto.getItemCollection() == null || multiOrderDto.getItemCollection().isEmpty()) {
+			throw new IllegalArgumentException("Item collection cannot be null or empty");
+		}
 	}
+
 	private OrderItem createOrderItem(ItemCollection item, Order order) throws FoodNotAvailable {
-	    // Find food item or throw exception
-	    FoodItem foodItem = foodItemRepository.findById(item.getItemId())
-	            .orElseThrow(() -> new FoodNotAvailable("Food item with ID " + item.getItemId() + " not found"));
+		// Find food item or throw exception
+		FoodItem foodItem = foodItemRepository.findById(item.getItemId())
+				.orElseThrow(() -> new FoodNotAvailable("Food item with ID " + item.getItemId() + " not found"));
 
-	    // Validate quantity
-	    if (item.getNoofItem() == null || item.getNoofItem() <= 0) {
-	        throw new IllegalArgumentException("Invalid quantity for item ID " + item.getItemId());
-	    }
+		// Validate quantity
+		if (item.getNoofItem() == null || item.getNoofItem() <= 0) {
+			throw new IllegalArgumentException("Invalid quantity for item ID " + item.getItemId());
+		}
 
-	    // Calculate item total price and create OrderItem
-	    double itemTotalPrice = Double.parseDouble(foodItem.getItemprice()) * item.getNoofItem();
-	    OrderItem orderItem = new OrderItem();
-	    orderItem.setFoodItem(foodItem);
-	    orderItem.setOrder(order);
-	    orderItem.setQuantity(item.getNoofItem());
-	    orderItem.setItemTotalPrice(itemTotalPrice);
+		// Calculate item total price and create OrderItem
+		double itemTotalPrice = Double.parseDouble(foodItem.getItemprice()) * item.getNoofItem();
+		OrderItem orderItem = new OrderItem();
+		orderItem.setFoodItem(foodItem);
+		orderItem.setOrder(order);
+		orderItem.setQuantity(item.getNoofItem());
+		orderItem.setItemTotalPrice(itemTotalPrice);
 
-	    return orderItem;
+		return orderItem;
 	}
+
 	private Order initializeOrder(MultiOrderDto multiOrderDto, User user) {
-	    Order order = new Order();
-	    order.setDeliveryAddress(multiOrderDto.getDeliveryAddress());
-	    order.setOrderDate(LocalDate.now());
-	    order.setUserDetails(user);
-	    order.setStatus("ordered");
-	    return order;
+		Order order = new Order();
+		order.setDeliveryAddress(multiOrderDto.getDeliveryAddress());
+		order.setOrderDate(LocalDate.now());
+		order.setUserDetails(user);
+		order.setStatus("ordered");
+		return order;
 	}
-   
+
 	private List<OrderItem> processOrderItems(MultiOrderDto multiOrderDto, Order order) {
-	    return multiOrderDto.getItemCollection().stream()
-	            .map(item -> {
-	                try {
-	                    return createOrderItem(item, order);
-	                } catch (FoodNotAvailable e) {
-	                    throw new IllegalArgumentException(e); 
-	                }
-	            })
-	            .filter(Objects::nonNull)
-	            .collect(Collectors.toList());
+		return multiOrderDto.getItemCollection().stream().map(item -> {
+			try {
+				return createOrderItem(item, order);
+			} catch (FoodNotAvailable e) {
+				throw new IllegalArgumentException(e);
+			}
+		}).filter(Objects::nonNull).collect(Collectors.toList());
 	}
-	
 
 	private double calculateTotalOrderPrice(List<OrderItem> orderItems) {
-	    return orderItems.stream()
-	            .mapToDouble(OrderItem::getItemTotalPrice)
-	            .sum();
+		return orderItems.stream().mapToDouble(OrderItem::getItemTotalPrice).sum();
 	}
 
 	private int calculateTotalItemCount(List<OrderItem> orderItems) {
-	    return orderItems.stream()
-	            .mapToInt(OrderItem::getQuantity)
-	            .sum();
+		return orderItems.stream().mapToInt(OrderItem::getQuantity).sum();
 	}
 
 	private ResponseOrderDto buildResponseOrderDto(Order savedOrder, User user, double totalOrderPrice) {
-	    return new ResponseOrderDto(
-	            savedOrder.getOrderId(),
-	            savedOrder.getDeliveryAddress(),
-	            savedOrder.getItemName(),
-	            user.getUserName(),
-	            savedOrder.getOrderDate(),
-	            savedOrder.getNosOfItem(),
-	            totalOrderPrice
-	    );
+		return new ResponseOrderDto(savedOrder.getOrderId(), savedOrder.getDeliveryAddress(), savedOrder.getItemName(),
+				user.getUserName(), savedOrder.getOrderDate(), savedOrder.getNosOfItem(), totalOrderPrice);
 	}
 
-     // 5 view all the order 	
+	// 5 view all the order
 	@Override
 	public List<ResponseOrderDto> viewOrders(Long id) throws OrderNotFoundException {
 		List<Order> order = orderRepository.findByUserId(id);
-		if(order.isEmpty()) {
+		if (order.isEmpty()) {
 			throw new OrderNotFoundException("User id is not Found");
 		}
 		List<ResponseOrderDto> result = order.stream().map(o -> mapToResponseOrderDto(o)).collect(Collectors.toList());

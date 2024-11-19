@@ -29,6 +29,7 @@ public class FoodOrderController {
 
 	@Autowired
 	private FoodOrderService foodOrderService;
+	
 
 	@GetMapping("itemBy/{name}")
 	public ResponseEntity<Object> searchFoodByName(@PathVariable("name") String name) throws FoodNotAvailable {
@@ -42,7 +43,7 @@ public class FoodOrderController {
 		return new ResponseEntity<>(searchVendorByName, HttpStatus.OK);
 	}
 
-	@PostMapping("/order")
+	@PostMapping("/orderSingle")
 	public ResponseEntity<ResponseOrderDto> placeSingleItemOrder(@RequestBody OrderDto orderDto)
 			throws FoodNotAvailable, UserNotFoundException, VendorNameIsNotFount {
 		ResponseOrderDto placeSingleItemOrder = foodOrderService.placeSingleItemOrder(orderDto);
@@ -60,4 +61,7 @@ public class FoodOrderController {
 	public List<ResponseOrderDto> viewOrders(@RequestParam Long id) throws OrderNotFoundException {
 		return foodOrderService.viewOrders(id);
 	}
+	
+	
+	
 }

@@ -15,5 +15,5 @@ public class OrderDto {
 	@NotNull(message = "Number of items is required")
 	@Min(value = 1, message = "Number of items must be at least 1")
 	private Integer nosOfItem;
-	
+	private FundTransferDto fundTransferDto;
 }
