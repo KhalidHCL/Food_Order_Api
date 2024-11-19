@@ -73,14 +73,19 @@ public class FoodOrderServiceImple implements FoodOrderService {
 				.orElseThrow(() -> new UserNotFoundException("User is not Exist"));
 		FoodItem fooditem = foodItemRepository.findById(orderDto.getItemId())
 				.orElseThrow(() -> new FoodNotAvailable("Food item not found"));
-		
+
 		Integer nosOfItem = orderDto.getNosOfItem();
 		if (nosOfItem == null || nosOfItem <= 0) {
 			throw new IllegalArgumentException("Number of items must be greater than zero");
 		}
-		Double totalAmount =orderDto.getFundTransferDto().setAmount((Double.parseDouble(fooditem.getItemprice()) * nosOfItem));
-		String success = bankClient.transferFunds(orderDto.getFundTransferDto());	
-		if(!success.equalsIgnoreCase("success")) {
+		Double totalPrice = Double.parseDouble(fooditem.getItemprice());
+		totalPrice = totalPrice * nosOfItem;
+
+		orderDto.getFundTransferDto().setAmount(totalPrice);
+
+		String success = bankClient.transferFunds(orderDto.getFundTransferDto());
+		System.out.println(success);
+		if (!success.equalsIgnoreCase("success")) {
 			throw new TransactionFailException("Transaction is failed please try again");
 		}
 		Order order = new Order();

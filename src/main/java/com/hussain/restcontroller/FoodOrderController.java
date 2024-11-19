@@ -19,6 +19,7 @@ import com.hussain.dto.ResponseOrderDto;
 import com.hussain.entites.FoodItem;
 import com.hussain.exception.FoodNotAvailable;
 import com.hussain.exception.OrderNotFoundException;
+import com.hussain.exception.TransactionFailException;
 import com.hussain.exception.UserNotFoundException;
 import com.hussain.exception.VendorNameIsNotFount;
 import com.hussain.service.FoodOrderService;
@@ -45,7 +46,7 @@ public class FoodOrderController {
 
 	@PostMapping("/orderSingle")
 	public ResponseEntity<ResponseOrderDto> placeSingleItemOrder(@RequestBody OrderDto orderDto)
-			throws FoodNotAvailable, UserNotFoundException, VendorNameIsNotFount {
+			throws FoodNotAvailable, UserNotFoundException, VendorNameIsNotFount, TransactionFailException {
 		ResponseOrderDto placeSingleItemOrder = foodOrderService.placeSingleItemOrder(orderDto);
 		return new ResponseEntity<>(placeSingleItemOrder, HttpStatus.ACCEPTED);
 	}

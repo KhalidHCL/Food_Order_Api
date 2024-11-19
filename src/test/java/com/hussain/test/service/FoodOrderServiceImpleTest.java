@@ -32,6 +32,7 @@ import com.hussain.entites.User;
 import com.hussain.entites.Vendor;
 import com.hussain.exception.FoodNotAvailable;
 import com.hussain.exception.OrderNotFoundException;
+import com.hussain.exception.TransactionFailException;
 import com.hussain.exception.UserNotFoundException;
 import com.hussain.exception.VendorNameIsNotFount;
 import com.hussain.repository.FoodItemRepository;
@@ -162,7 +163,7 @@ class FoodOrderServiceImpleTest {
     //3 one order place order api test case
     
     @Test
-    void testPlaceSingleItemOrder_Success() throws FoodNotAvailable, UserNotFoundException, VendorNameIsNotFount {
+    void testPlaceSingleItemOrder_Success() throws FoodNotAvailable, UserNotFoundException, VendorNameIsNotFount, TransactionFailException {
         // Prepare test data
         Long userId = 1L;
         Long itemId = 101L;
